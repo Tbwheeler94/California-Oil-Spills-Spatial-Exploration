@@ -2,21 +2,34 @@
 title: "Species richness of cetacean species off the coast of California"
 author: "Tom Wheeler"
 date: "2/17/2021"
-output: html_document
+output:
+  html_document:
+    theme: space
+    code_folding: hide
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+### Overview 
 
-library(raster) ### NOTE: attaching this BEFORE tidyverse
+This project generates a raster of species richness of cetacean species off the coast of California. Species richness is  the number of species that occur in a particular location.  
+
+### Data
+
+This raster data shows the probability of occurrence (based on relative environmental suitability, including species preferences for water temperature, depth, salinity, and distance to land) of 35 cetacean species that can be found in the California Bight. The extent of the rasters is 125° W to 115°W (which R considers -125 to -115) and 32°N to 38°N.  
+
+Data source: [aquamaps.org](https://www.aquamaps.org)
+
+```{r setup, echo=TRUE, message=FALSE, warning=FALSE, error=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(raster)
 library(tidyverse)
 library(here)
 library(sf)
 library(fasterize)
-library(rnaturalearth)
+library(rnaturalearth, verbose = FALSE)
 ```
 
-```{r}
+```{r, message=FALSE, warning=FALSE, echo=TRUE, error=FALSE}
 #create list of files for stack to grab
 raster_files <- list.files(path = here('data_raster'), full.names = TRUE)
 
@@ -24,10 +37,10 @@ raster_files <- list.files(path = here('data_raster'), full.names = TRUE)
 aq_stack <- stack(raster_files)
 
 #download coastline data from natural earth package
-coastline110 <- ne_download(scale = 110, type = 'coastline', category = 'physical', returnclass = "sf")
+coastline110 <- ne_download(scale = 110, type = 'land', category = 'physical', returnclass = "sf")
 ```
 
-```{r}
+```{r, echo=TRUE, message=FALSE, warning=FALSE, error=FALSE}
 #create function to calculate threshold for raster
 is_species <- function(x, thresh = .6) {
   y <- ifelse(x >= thresh, 1, 0)
@@ -40,15 +53,20 @@ rs_summed <- calc(rs, fun = sum)
 
 ```
 
-```{r}
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
 rs_summed_df <- raster::rasterToPoints(rs_summed) %>%
   as.data.frame()
 
 ggplot() + 
   geom_raster(data = rs_summed_df, aes(x = x, y = y, fill = layer)) +
-  geom_sf(data = coastline110)  +
+  geom_sf(data = coastline110, color = 'black', fill = 'gray', alpha = .5)  +
   coord_sf(xlim = c(-123, -115), ylim = c(32, 35), expand = FALSE) +
-  scale_colour_gradient2(low = 'white', mid = 'yellow', high = 'blue') +
-  theme_void()
+  scale_fill_gradient(name = 'Number of Species', low = 'yellow', high = 'blue') +
+  theme_void() +
+  theme(plot.title = element_text(hjust = 1)) +
+  labs(
+    title = "Species Richness Along The Santa Barbara Coastline"
+  )
 ```
 
+**Figure 1:** The map above indicates the distribution of species richness along the Santa Barbara coastline. Species richness appears to be relatively stable as one moves off the coastline with a species richness hotspot at the northern end of the dataset. A 0.6 probability threshold was used to calculate aggregate richness data, meaning, if the probability of a species being present was higher than 60% for a given raster cell, this value was converted to a confirmed siting. Any values with less than a 60% probability were not counted as a siting.
