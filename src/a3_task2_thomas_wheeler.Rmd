@@ -1,0 +1,54 @@
+---
+title: "Species richness of cetacean species off the coast of California"
+author: "Tom Wheeler"
+date: "2/17/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(raster) ### NOTE: attaching this BEFORE tidyverse
+library(tidyverse)
+library(here)
+library(sf)
+library(fasterize)
+library(rnaturalearth)
+```
+
+```{r}
+#create list of files for stack to grab
+raster_files <- list.files(path = here('data_raster'), full.names = TRUE)
+
+#create stack of rasters
+aq_stack <- stack(raster_files)
+
+#download coastline data from natural earth package
+coastline110 <- ne_download(scale = 110, type = 'coastline', category = 'physical', returnclass = "sf")
+```
+
+```{r}
+#create function to calculate threshold for raster
+is_species <- function(x, thresh = .6) {
+  y <- ifelse(x >= thresh, 1, 0)
+  return(y)
+}
+
+#reclassify probability layers into 1 or 0
+rs <- calc(aq_stack, fun = is_species)
+rs_summed <- calc(rs, fun = sum)
+
+```
+
+```{r}
+rs_summed_df <- raster::rasterToPoints(rs_summed) %>%
+  as.data.frame()
+
+ggplot() + 
+  geom_raster(data = rs_summed_df, aes(x = x, y = y, fill = layer)) +
+  geom_sf(data = coastline110)  +
+  coord_sf(xlim = c(-123, -115), ylim = c(32, 35), expand = FALSE) +
+  scale_colour_gradient2(low = 'white', mid = 'yellow', high = 'blue') +
+  theme_void()
+```
+
